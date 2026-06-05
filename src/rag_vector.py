@@ -1,7 +1,7 @@
 """
 rag_vector.py
 
-Vector-based RAG using ChromaDB for storage and API-based embeddings.
+Vector-based RAG using a pluggable vector store (Chroma or Qdrant) with API-based embeddings.
 Features: persistent storage, hybrid search (vector + keyword), sentence-aware chunking,
 configurable embedding endpoint via EMBEDDING_URL env var.
 """
@@ -11,7 +11,10 @@ import hashlib
 import re
 import logging
 import numpy as np
-from typing import List, Dict, Any, Optional, Set
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Set
+
+if TYPE_CHECKING:
+    from src.vector_store import VectorCollection
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -38,11 +41,11 @@ def _generate_doc_id(text: str, owner: str = "") -> str:
 
 
 class VectorRAG:
-    """RAG system using ChromaDB vector storage with hybrid search."""
+    """RAG system using vector storage with hybrid search."""
 
     def __init__(self, persist_directory: str = "data/chroma"):
         self.persist_directory = persist_directory
-        self._collection = None
+        self._collection: Optional["VectorCollection"] = None
         self._model = None
         self._healthy = False
 
@@ -55,17 +58,16 @@ class VectorRAG:
 
     def _initialize_system(self) -> bool:
         try:
-            from src.chroma_client import get_chroma_client
             from src.embeddings import get_embedding_client
+            from src.vector_store import get_vector_collection
 
             self._model = get_embedding_client()
             if self._model is None:
                 raise RuntimeError("No embedding backend available")
             logger.info(f"Embedding: {self._model.url} model={self._model.model}")
 
-            client = get_chroma_client()
-            self._collection = client.get_or_create_collection(
-                name=COLLECTION_NAME,
+            self._collection = get_vector_collection(
+                COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"},
             )
 
@@ -93,7 +95,7 @@ class VectorRAG:
 
     @property
     def collection(self):
-        """Expose the ChromaDB collection for direct access by personal_routes etc."""
+        """Expose the vector collection for direct access by personal_routes etc."""
         return self._collection
 
     # ------------------------------------------------------------------
@@ -197,7 +199,7 @@ class VectorRAG:
 
             query_embeddings = self._embed([query])
 
-            # Use ChromaDB where filter for owner if specified
+            # Use where filter for owner if specified
             where_filter = {"owner": owner} if owner else None
 
             results = self._collection.query(
@@ -216,7 +218,7 @@ class VectorRAG:
                 doc_text = results["documents"][0][idx]
                 meta = results["metadatas"][0][idx]
 
-                # ChromaDB cosine distance = 1 - cosine_similarity
+                # cosine distance = 1 - cosine_similarity
                 vector_sim = 1.0 - distance
 
                 # Keyword overlap score
@@ -290,14 +292,10 @@ class VectorRAG:
 
     def rebuild_index(self) -> bool:
         try:
-            from src.chroma_client import get_chroma_client
-            client = get_chroma_client()
-            try:
-                client.delete_collection(COLLECTION_NAME)
-            except Exception:
-                pass
-            self._collection = client.get_or_create_collection(
-                name=COLLECTION_NAME,
+            from src.vector_store import delete_vector_collection, get_vector_collection
+            delete_vector_collection(COLLECTION_NAME)
+            self._collection = get_vector_collection(
+                COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"},
             )
             self._healthy = True
@@ -386,8 +384,8 @@ class VectorRAG:
         """Remove all chunks under ``directory`` (recursively), and nothing else.
 
         Selection is a Python-side path-boundary match on each chunk's stored
-        ``source`` full path, NOT a Chroma metadata ``where`` filter. No Chroma
-        metadata operator selects a scalar string by path prefix (``$contains``
+        ``source`` full path, NOT a ``where`` filter. No vector-store metadata
+        operator selects a scalar string by path prefix (``$contains``
         targets document content / list membership, not a ``source`` substring),
         and a plain substring would over-delete siblings — removing ``/docs``
         must not touch ``/docs2`` or ``/docs_personal``. We therefore match

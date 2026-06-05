@@ -17,7 +17,7 @@ A self-hosted AI workspace -- meant to be the self-hosted version of the UI expe
   - **Deep Research** -- multi-step runs that gather, read, and synthesize sources into a nice visual report.<br>　<sub>adapted from [Tongyi DeepResearch](https://github.com/Alibaba-NLP/DeepResearch)</sub>
   - **Compare** -- a fun tool to compare models side by side. Test completely blind, no bias!<br>　<sub>multi-model · blind test · synthesis</sub>
   - **Documents** -- YOU write the text, AI is there to assist, not the opposite.<br>　<sub>multi-tab editor · markdown · HTML · CSV · syntax highlighting · AI edits · suggestions</sub>
-  - **Memory / Skills** -- Persistent memory and skills, your agent evolves over time as it better understands you and your tasks!<br>　<sub>ChromaDB · fastembed (ONNX) · vector + keyword retrieval · import/export</sub>
+  - **Memory / Skills** -- Persistent memory and skills, your agent evolves over time as it better understands you and your tasks!<br>　<sub>ChromaDB · Qdrant · fastembed (ONNX) · vector + keyword retrieval · import/export</sub>
   - **Email** -- IMAP/SMTP inbox with AI triage built in: urgency reminders, auto-tag, auto-summary, auto-reply drafts, auto-spam.<br>　<sub>IMAP · SMTP · per-account routing · CalDAV-aware</sub>
   - **Notes & Tasks** -- Quick notes with reminders, a todo list, and scheduled tasks the agent can act on.<br>　<sub>note pings · checklist · cron-style tasks · ntfy / browser / email channels</sub>
   - **Calendar** -- Local-first calendar with CalDAV sync to Radicale / Nextcloud / Apple / Fastmail.<br>　<sub>CalDAV pull · .ics import/export · per-calendar colors · agent-aware</sub>
@@ -116,7 +116,8 @@ expose this port directly to the public internet. To build a clickable app wrapp
 <summary>Cookbook, GPU, Ollama, and troubleshooting notes</summary>
 
 **Docker bundled services.** Compose starts Odysseus, ChromaDB, SearXNG, and
-ntfy. Odysseus and the bundled service ports bind to `127.0.0.1` by default, so
+ntfy. To use Qdrant instead of ChromaDB, set `VECTOR_STORE=qdrant` and start the
+Qdrant service with `COMPOSE_PROFILES=qdrant docker compose up`. Odysseus and the bundled service ports bind to `127.0.0.1` by default, so
 they are reachable from the host but not exposed to your LAN/public internet
 unless you opt in.
 
@@ -248,7 +249,7 @@ install usually only need to add the endpoint in Settings.
 ```bash
 docker compose ps
 docker compose logs --tail=120 odysseus
-docker compose logs odysseus | grep -E 'ChromaDB|MemoryVectorStore|DEGRADED'
+docker compose logs odysseus | grep -E 'ChromaDB|Qdrant|MemoryVectorStore|DEGRADED'
 ```
 
 **macOS details.** `start-macos.sh` installs Homebrew deps, creates the venv,
@@ -306,6 +307,8 @@ If `chromadb-client` (the lightweight HTTP-only package) is installed alongside 
 ./venv/bin/pip install --force-reinstall chromadb
 ```
 
+Alternatively, switch to Qdrant (`VECTOR_STORE=qdrant`) to avoid the ChromaDB package conflict entirely.
+
 ### HTTPS + LAN/Tailscale exposure
 To expose Odysseus on a local network or Tailscale with HTTPS:
 1. Change the bind address to `0.0.0.0` in `.env` (`APP_BIND=0.0.0.0` or `ODYSSEUS_HOST=0.0.0.0`).
@@ -329,6 +332,7 @@ To expose Odysseus on a local network or Tailscale with HTTPS:
 | `duckduckgo-search` | DuckDuckGo as a search provider option. |
 | `PyMuPDF` | PDF page rendering in the side viewer panel and form-filling. (Note: AGPL-3.0) |
 | `markitdown` | Office/EPUB document text extraction (converts .docx/.xlsx/.pptx/.xls/.epub to Markdown). |
+| `qdrant-client` | High-performance, open-source vector search. Alternative to Chroma (Default). |
 
 ## Security Notes
 Odysseus is a self-hosted workspace with powerful local tools: shell access, file uploads, model downloads, web research, email/calendar integrations, and API tokens. Treat it like an admin console.
@@ -343,7 +347,7 @@ Odysseus is a self-hosted workspace with powerful local tools: shell access, fil
 - Rotate any API keys or tokens that were ever pasted into a shared chat, demo, screenshot, or log.
 - If you enable API tokens or webhooks, create separate tokens per integration and delete unused ones.
 - Prefer binding manual development runs to `127.0.0.1`; bind to `0.0.0.0` only when you intentionally want LAN/reverse-proxy access.
-- Keep ChromaDB, SearXNG, ntfy, Ollama, vLLM, llama.cpp, databases, and raw model/provider APIs internal-only. Expose only the authenticated Odysseus web/API entrypoint through your trusted proxy or private access layer.
+- Keep ChromaDB, Qdrant, SearXNG, ntfy, Ollama, vLLM, llama.cpp, databases, and raw model/provider APIs internal-only. Expose only the authenticated Odysseus web/API entrypoint through your trusted proxy or private access layer.
 - Before publishing a fork, run `git status --short` and confirm no private files from `.env`, `data/`, `logs/`, uploads, backups, or local databases are staged.
 
 ### Private or proxied deployments
@@ -364,6 +368,7 @@ Common internal-only ports from the default docs/compose setup:
 | `8080` | SearXNG |
 | `8091` | ntfy |
 | `8100` | ChromaDB host port for manual/compose access |
+| `6333` | Qdrant host port for manual/compose access |
 | `11434` | Ollama |
 | `8000-8020` | Common local model/provider APIs |
 
@@ -390,8 +395,13 @@ Key settings:
 | `LOCALHOST_BYPASS` | `false` | Development-only auth bypass for loopback requests. Keep false for shared/network deployments. |
 | `SECURE_COOKIES` | `false` | Set true when serving Odysseus through HTTPS at a trusted proxy or private access gateway. |
 | `DATABASE_URL` | `sqlite:///./data/app.db` | Database connection string |
-| `CHROMADB_HOST` | `localhost` | ChromaDB host for vector memory. Docker overrides this to `chromadb`. |
-| `CHROMADB_PORT` | `8100` | ChromaDB port for manual host runs. Docker overrides this to `8000`. |
+| `VECTOR_STORE` | `chroma` | Vector store backend: `chroma` or `qdrant` |
+| `CHROMADB_HOST` | `localhost` | ChromaDB host. Docker overrides to `chromadb`. |
+| `CHROMADB_PORT` | `8100` | ChromaDB port. Docker overrides to `8000`. |
+| `QDRANT_HOST` | `localhost` | Qdrant host. Docker overrides to `qdrant`. |
+| `QDRANT_PORT` | `6333` | Qdrant port. |
+| `QDRANT_URL` | -- | Full Qdrant URL (e.g. for Qdrant Cloud). Overrides host/port. |
+| `QDRANT_API_KEY` | -- | Qdrant API key for cloud deployments. |
 | `EMBEDDING_URL` | -- | OpenAI-compatible embeddings endpoint |
 
 ### Built-in MCP servers (optional setup)
@@ -419,7 +429,7 @@ docs/      landing page (index.html) + preview clips
 
 ## Data
 All user data lives in `data/` (gitignored): `app.db` (sessions, messages, documents),
-`memory.json`, `presets.json`, `uploads/`, `personal_docs/`, `chroma/`, `settings.json`.
+`memory.json`, `presets.json`, `uploads/`, `personal_docs/`, `chroma/` (or Qdrant server-side), `settings.json`.
 
 ## Star History
 

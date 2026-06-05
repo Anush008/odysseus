@@ -1,13 +1,16 @@
 """
 memory_vector.py
 
-ChromaDB-backed vector store for memory entries.
+Vector store for memory entries.
 Shares the EmbeddingClient with RAG to save memory.
-Stores pre-computed embeddings (ChromaDB does not manage embedding).
+Stores pre-computed embeddings supplied by the caller.
 """
 
 import logging
-from typing import List, Dict, Optional
+from typing import TYPE_CHECKING, List, Dict, Optional
+
+if TYPE_CHECKING:
+    from src.vector_store import VectorCollection
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +22,13 @@ class MemoryVectorStore:
 
     def __init__(self, data_dir: str, embedding_model=None):
         self._model = embedding_model
-        self._collection = None
+        self._collection: Optional["VectorCollection"] = None
         self._healthy = False
 
         self._initialize()
 
     def _initialize(self):
         try:
-            from src.chroma_client import get_chroma_client
-
             if self._model is None:
                 from src.embeddings import get_embedding_client
                 self._model = get_embedding_client()
@@ -35,9 +36,9 @@ class MemoryVectorStore:
                     raise RuntimeError("No embedding backend available")
                 logger.info(f"MemoryVectorStore using embeddings: {self._model.url}")
 
-            client = get_chroma_client()
-            self._collection = client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
+            from src.vector_store import get_vector_collection
+            self._collection = get_vector_collection(
+                self.COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"},
             )
 
@@ -91,7 +92,7 @@ class MemoryVectorStore:
         """Search for the most relevant memory IDs by semantic similarity.
         Returns list of {"memory_id": str, "score": float}.
 
-        ChromaDB cosine distance = 1 - cosine_similarity.
+        cosine distance = 1 - cosine_similarity.
         We convert back: similarity = 1.0 - distance.
         """
         if not self._healthy or self._collection.count() == 0:
@@ -137,16 +138,11 @@ class MemoryVectorStore:
         if not self._healthy:
             return
 
-        from src.chroma_client import get_chroma_client
+        from src.vector_store import delete_vector_collection, get_vector_collection
 
-        # Delete and recreate collection for a clean rebuild
-        client = get_chroma_client()
-        try:
-            client.delete_collection(self.COLLECTION_NAME)
-        except Exception:
-            pass
-        self._collection = client.get_or_create_collection(
-            name=self.COLLECTION_NAME,
+        delete_vector_collection(self.COLLECTION_NAME)
+        self._collection = get_vector_collection(
+            self.COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"},
         )
 
