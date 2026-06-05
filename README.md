@@ -116,8 +116,17 @@ expose this port directly to the public internet. To build a clickable app wrapp
 <summary>Cookbook, GPU, Ollama, and troubleshooting notes</summary>
 
 **Docker bundled services.** Compose starts Odysseus, ChromaDB, SearXNG, and
-ntfy. To use Qdrant instead of ChromaDB, set `VECTOR_STORE=qdrant` and start the
-Qdrant service with `COMPOSE_PROFILES=qdrant docker compose up`. Odysseus and the bundled service ports bind to `127.0.0.1` by default, so
+ntfy. To use Qdrant instead of ChromaDB, add to `.env` and rebuild once:
+
+```env
+VECTOR_STORE=qdrant
+INSTALL_OPTIONAL=true   # pulls qdrant-client from requirements-optional.txt
+```
+```bash
+docker compose build && COMPOSE_PROFILES=qdrant docker compose up
+```
+
+Odysseus and the bundled service ports bind to `127.0.0.1` by default, so
 they are reachable from the host but not exposed to your LAN/public internet
 unless you opt in.
 

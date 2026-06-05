@@ -22,9 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python deps first (layer cache)
-COPY requirements.txt .
+# Install Python deps first (layer cache). Optional extras (PyMuPDF AGPL, etc.)
+# are opt-in so the default image stays MIT-core; see requirements-optional.txt.
+COPY requirements.txt requirements-optional.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+ARG INSTALL_OPTIONAL=false
+RUN [ "$INSTALL_OPTIONAL" != "true" ] || pip install --no-cache-dir -r requirements-optional.txt
 
 # Copy app code
 COPY . .
