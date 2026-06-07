@@ -4,6 +4,10 @@ from typing import Any, Dict, List, Optional, Protocol
 _BACKEND = os.getenv("VECTOR_STORE", "chroma").lower()
 
 
+def vector_store_backend() -> str:
+    return _BACKEND
+
+
 class VectorCollection(Protocol):
     """
     Interface every vector store backend must satisfy.

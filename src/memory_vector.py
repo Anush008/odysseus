@@ -194,21 +194,14 @@ class MemoryVectorStore:
         if not self._healthy:
             return
 
-        from src.chroma_client import get_chroma_client
+        from src.vector_store import delete_vector_collection
 
-        client = get_chroma_client()
-        lane_names = [
+        for name in (
             self.COLLECTION_NAME,
             collection_name(self.COLLECTION_NAME, LANE_CUSTOM),
             collection_name(self.COLLECTION_NAME, LANE_FASTEMBED),
-        ]
-        for name in lane_names:
-            try:
-                client.delete_collection(name)
-            except Exception:
-                pass
-        # Explicit rebuilds must start from the supplied memory list, so clear
-        # legacy unsuffixed collections too.
+        ):
+            delete_vector_collection(name)
         self._lanes = build_embedding_lanes(self.COLLECTION_NAME)
         self._collection = next(
             (lane.collection for lane in self._lanes if lane.name == LANE_FASTEMBED),

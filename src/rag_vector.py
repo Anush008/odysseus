@@ -354,22 +354,14 @@ class VectorRAG:
 
     def rebuild_index(self) -> bool:
         try:
-            from src.chroma_client import get_chroma_client
-            client = get_chroma_client()
-            try:
-                client.delete_collection(COLLECTION_NAME)
-            except Exception:
-                pass
+            from src.vector_store import delete_vector_collection
+
             for name in (
+                COLLECTION_NAME,
                 collection_name(COLLECTION_NAME, LANE_CUSTOM),
                 collection_name(COLLECTION_NAME, LANE_FASTEMBED),
             ):
-                try:
-                    client.delete_collection(name)
-                except Exception:
-                    pass
-            # Rebuild means empty current lanes. Clear the legacy unsuffixed
-            # collection too so startup migration cannot resurrect stale docs.
+                delete_vector_collection(name)
             self._lanes = build_embedding_lanes(COLLECTION_NAME)
             self._collection = next(
                 (lane.collection for lane in self._lanes if lane.name == LANE_FASTEMBED),
