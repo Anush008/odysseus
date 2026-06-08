@@ -13,6 +13,8 @@ import logging
 import numpy as np
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Set
 
+from src.constants import CHROMA_DIR
+
 if TYPE_CHECKING:
     from src.vector_store import VectorCollection
 from pathlib import Path
@@ -54,7 +56,7 @@ def _generate_doc_id(text: str, owner: str = "") -> str:
 class VectorRAG:
     """RAG system using vector storage with hybrid search."""
 
-    def __init__(self, persist_directory: str = "data/chroma"):
+    def __init__(self, persist_directory: str = CHROMA_DIR):
         self.persist_directory = persist_directory
         self._collection: Optional["VectorCollection"] = None
         self._model = None

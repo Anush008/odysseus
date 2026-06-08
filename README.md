@@ -1,5 +1,7 @@
 # Odysseus
 
+> **Branch note:** `dev` is the default branch and contains the latest development changes, but it may be unstable. For the more stable curated branch, use [`main`](https://github.com/pewdiepie-archdaemon/odysseus/tree/main).
+
 ```
 ───────────────────────────────────────────────
  ⊹ ࣪ ˖ ૮( ˶ᵔ ᵕ ᵔ˶ )っ  Odysseus vers. 1.0
@@ -413,6 +415,7 @@ Key settings:
 | `QDRANT_URL` | -- | Full Qdrant URL (e.g. for Qdrant Cloud). Overrides host/port. |
 | `QDRANT_API_KEY` | -- | Qdrant API key for cloud deployments. |
 | `EMBEDDING_URL` | -- | OpenAI-compatible embeddings endpoint |
+| `ODYSSEUS_CHAT_UPLOAD_MAX_BYTES` | `10485760` | Chat/agent attachment cap in bytes. Raise for larger local PDFs or text documents. |
 
 ### Built-in MCP servers (optional setup)
 
